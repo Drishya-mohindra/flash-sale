@@ -1,0 +1,13 @@
+# Optional: use a Dockerised Postgres instead of the embedded one.
+#   docker compose up -d
+#   DATABASE_URL=postgres://postgres:postgres@localhost:5432/flashsale npm run up
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: flashsale
+    command: ["postgres", "-c", "max_connections=200"]
+    ports:
+      - "5432:5432"

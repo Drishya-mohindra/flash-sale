@@ -1,0 +1,674 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Flash Sale Console</title>
+<style>
+  :root {
+    --bg: #f4f5f7; --surface: #ffffff; --surface-2: #f8f9fb; --line: #e6e8ec; --line-2: #eef0f3;
+    --text: #0e1116; --muted: #5f6774; --faint: #9199a6;
+    --sold: #4f46e5; --sold-soft: #e9e8fd;
+    --reserved: #e8a317; --reserved-soft: #fdf3dc;
+    --pending: #ea7a1c;
+    --ok: #15803d; --ok-soft: #e3f4e8;
+    --bad: #c2362b; --bad-soft: #fbe6e3;
+    --refund: #8b5cf6; --refund-soft: #efe9fe;
+    --idle: #a3aab5; --idle-soft: #eef0f3;
+    --cell-empty: #e9ecf0;
+    --shadow: 0 1px 2px rgba(16, 24, 40, .04), 0 1px 1px rgba(16, 24, 40, .03);
+    --pop-shadow: 0 12px 32px rgba(16, 24, 40, .14), 0 2px 6px rgba(16, 24, 40, .06);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0a0c0f; --surface: #12151a; --surface-2: #161a20; --line: #222831; --line-2: #1b2027;
+      --text: #e7e9ed; --muted: #959dab; --faint: #677080;
+      --sold: #8b85ff; --sold-soft: #23224a;
+      --reserved: #f0b53a; --reserved-soft: #3a2e12;
+      --pending: #f59547;
+      --ok: #4ade80; --ok-soft: #12301d;
+      --bad: #f87166; --bad-soft: #3d1714;
+      --refund: #b197fc; --refund-soft: #2a2145;
+      --idle: #6b7482; --idle-soft: #1f242c;
+      --cell-empty: #20252d;
+      --shadow: 0 1px 0 rgba(255, 255, 255, .02);
+      --pop-shadow: 0 16px 40px rgba(0, 0, 0, .55);
+    }
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 14px/1.45 Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-feature-settings: "tnum" 1, "cv11" 1; -webkit-font-smoothing: antialiased;
+  }
+  button { font: inherit; color: inherit; }
+  .mono { font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, monospace; font-size: 12px; }
+  .muted { color: var(--muted); }
+
+  /* ---- Top bar ---- */
+  .topbar {
+    position: sticky; top: 0; z-index: 20; background: color-mix(in srgb, var(--bg) 82%, transparent);
+    backdrop-filter: saturate(160%) blur(10px); -webkit-backdrop-filter: saturate(160%) blur(10px);
+    border-bottom: 1px solid var(--line);
+  }
+  .topbar-in { max-width: 1240px; margin: 0 auto; padding: 12px 20px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+  .brand { display: flex; align-items: center; gap: 12px; min-width: 0; margin-right: auto; }
+  .logo {
+    width: 32px; height: 32px; border-radius: 9px; flex: none; display: grid; place-items: center;
+    background: linear-gradient(135deg, var(--sold), color-mix(in srgb, var(--sold) 55%, var(--refund)));
+    color: #fff; box-shadow: inset 0 1px 0 rgba(255,255,255,.25);
+  }
+  .brand h1 { font-size: 15px; font-weight: 650; margin: 0; letter-spacing: -.01em; }
+  .brand .sub { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .live { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; color: var(--muted); }
+  .live .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); position: relative; }
+  .live .dot::after {
+    content: ""; position: absolute; inset: -4px; border-radius: 50%; border: 1.5px solid var(--ok);
+    opacity: 0; animation: ping 1.8s ease-out infinite;
+  }
+  .live.down .dot { background: var(--bad); }
+  .live.down .dot::after { display: none; }
+  @keyframes ping { 0% { transform: scale(.5); opacity: .7; } 100% { transform: scale(1.4); opacity: 0; } }
+
+  .pill {
+    display: inline-flex; align-items: center; gap: 7px; height: 30px; padding: 0 12px; border-radius: 99px;
+    border: 1px solid var(--line); background: var(--surface); font-size: 12.5px; font-weight: 550; cursor: pointer;
+    box-shadow: var(--shadow); transition: border-color .15s, background .15s;
+  }
+  .pill:hover { border-color: color-mix(in srgb, var(--muted) 40%, var(--line)); }
+  .pill .ic { width: 16px; height: 16px; border-radius: 50%; display: grid; place-items: center; font-size: 10px; color: #fff; background: var(--idle); }
+  .pill.ok .ic { background: var(--ok); }
+  .pill.bad { border-color: var(--bad); background: var(--bad-soft); color: var(--bad); }
+  .pill.bad .ic { background: var(--bad); }
+  .pill .chev { color: var(--faint); transition: transform .15s; }
+  .pill[aria-expanded="true"] .chev { transform: rotate(180deg); }
+  .btn {
+    height: 30px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface);
+    font-size: 12.5px; font-weight: 550; cursor: pointer; box-shadow: var(--shadow);
+  }
+  .btn:hover { background: var(--surface-2); }
+  .btn:disabled { opacity: .55; cursor: progress; }
+
+  .integrity-wrap { position: relative; }
+  .popover {
+    position: absolute; right: 0; top: calc(100% + 8px); width: min(420px, calc(100vw - 32px));
+    background: var(--surface); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--pop-shadow);
+    padding: 6px; display: none;
+  }
+  .popover.open { display: block; }
+  .popover header { padding: 10px 12px 8px; display: flex; justify-content: space-between; align-items: baseline; }
+  .popover header b { font-size: 13px; }
+  .popover header span { font-size: 11.5px; color: var(--faint); }
+  .checks { max-height: 60vh; overflow: auto; }
+  .chk { display: grid; grid-template-columns: 18px 1fr; gap: 2px 10px; padding: 8px 12px; border-radius: 8px; }
+  .chk:hover { background: var(--surface-2); }
+  .chk .s { grid-row: span 2; width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center; font-size: 10px; color: #fff; background: var(--ok); margin-top: 1px; }
+  .chk.fail .s { background: var(--bad); }
+  .chk .n { font-size: 13px; font-weight: 550; }
+  .chk .d { font-size: 12px; color: var(--muted); }
+
+  /* ---- Layout ---- */
+  main { max-width: 1240px; margin: 0 auto; padding: 20px 20px 56px; }
+  .banner {
+    display: none; gap: 12px; align-items: flex-start; padding: 12px 14px; border-radius: 10px; margin-bottom: 16px;
+    background: var(--reserved-soft); border: 1px solid color-mix(in srgb, var(--reserved) 40%, transparent); font-size: 13px;
+  }
+  .banner.show { display: flex; }
+  .banner.err { background: var(--bad-soft); border-color: color-mix(in srgb, var(--bad) 40%, transparent); }
+  .banner b { display: block; margin-bottom: 2px; }
+  .banner .act { margin-left: auto; flex: none; }
+
+  .kpis { display: grid; gap: 12px; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); min-width: 0; }
+  .kpi { padding: 16px 18px; }
+  .kpi .lbl { font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 7px; }
+  .kpi .lbl i { width: 8px; height: 8px; border-radius: 2px; }
+  .kpi .val { font-size: 30px; font-weight: 650; letter-spacing: -.025em; line-height: 1.15; margin-top: 6px; }
+  .kpi .val small { font-size: 15px; font-weight: 500; color: var(--faint); letter-spacing: 0; margin-left: 2px; }
+  .kpi .foot { font-size: 12px; color: var(--muted); margin-top: 8px; }
+  .meter { height: 4px; border-radius: 4px; background: var(--cell-empty); margin-top: 10px; overflow: hidden; display: flex; }
+  .meter i { display: block; height: 100%; transition: width .4s cubic-bezier(.2,.7,.2,1); }
+
+  .grid { display: grid; gap: 12px; margin-top: 12px; grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); }
+  .card-h { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 16px 18px 0; }
+  .card-h h2 { font-size: 13.5px; font-weight: 600; margin: 0; letter-spacing: -.005em; }
+  .card-h .aside { font-size: 12px; color: var(--faint); }
+  .card-b { padding: 14px 18px 18px; }
+
+  /* Inventory unit map */
+  .wh + .wh { margin-top: 18px; }
+  .wh-h { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; gap: 10px; }
+  .wh-h b { font-weight: 600; font-size: 13px; }
+  .wh-h .code { font-size: 11px; color: var(--faint); text-transform: uppercase; letter-spacing: .06em; margin-left: 6px; }
+  .wh-h .nums { font-size: 12px; color: var(--muted); white-space: nowrap; }
+  .cells { display: grid; grid-template-columns: repeat(25, minmax(0, 1fr)); gap: 3px; }
+  .cells span { aspect-ratio: 1; border-radius: 3px; background: var(--cell-empty); transition: background .3s; }
+  .cells span.sold { background: var(--sold); }
+  .cells span.reserved { background: var(--reserved); }
+  .legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 12px; color: var(--muted); margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line-2); }
+  .legend i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 6px; vertical-align: -.5px; }
+
+  /* Order lifecycle */
+  .stack { display: flex; height: 10px; border-radius: 6px; overflow: hidden; background: var(--cell-empty); gap: 2px; }
+  .stack i { display: block; height: 100%; transition: flex-grow .4s; min-width: 0; }
+  .groups { margin-top: 16px; display: grid; gap: 14px; }
+  .group-h { font-size: 11px; text-transform: uppercase; letter-spacing: .07em; color: var(--faint); margin-bottom: 4px; }
+  .srow { display: grid; grid-template-columns: 10px 1fr auto; align-items: center; gap: 10px; padding: 5px 0; font-size: 13px; }
+  .srow i { width: 8px; height: 8px; border-radius: 50%; }
+  .srow .n { font-weight: 600; min-width: 3ch; text-align: right; }
+  .srow.zero { color: var(--faint); }
+  .srow.zero .n { font-weight: 500; }
+
+  /* Demand funnel */
+  .stages { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .stage { padding: 2px 16px 0; border-left: 1px solid var(--line-2); min-width: 0; }
+  .stage:first-child { border-left: 0; padding-left: 0; }
+  .stage .t { font-size: 12px; color: var(--muted); }
+  .stage .v { font-size: 22px; font-weight: 650; letter-spacing: -.02em; margin-top: 2px; }
+  .stage .c { font-size: 11.5px; color: var(--faint); margin-top: 1px; }
+  .outcomes { display: flex; height: 10px; border-radius: 6px; overflow: hidden; background: var(--cell-empty); gap: 2px; margin-top: 16px; }
+  .outcomes i { display: block; height: 100%; min-width: 3px; transition: flex-grow .4s; }
+  .outcomes-key { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 12px; color: var(--muted); margin-top: 10px; }
+  .outcomes-key i { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 6px; }
+  .outcomes-key b { color: var(--text); font-weight: 600; margin-left: 4px; }
+
+  /* Timeline */
+  .chart-key { display: flex; gap: 12px; align-items: center; }
+  .chart-key i { display: inline-block; width: 12px; height: 2px; border-radius: 2px; margin-right: 5px; vertical-align: 3px; }
+  .chart-key i.bar { width: 8px; height: 8px; border-radius: 1px; vertical-align: 0; background: var(--faint); opacity: .45; }
+  .chart-key i.dash { background: repeating-linear-gradient(90deg, var(--reserved) 0 3px, transparent 3px 5px); }
+  .card.flex { display: flex; flex-direction: column; }
+  .card.flex .card-b { flex: 1; display: flex; min-height: 220px; }
+  .chart { width: 100%; flex: 1; min-height: 200px; display: block; }
+  .chart .gl { stroke: var(--line-2); stroke-width: 1; }
+  .chart .ax { fill: var(--faint); font-size: 10.5px; }
+  .chart-empty { fill: var(--faint); font-size: 12px; }
+
+  /* Payments */
+  .ledger { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 10px; padding: 12px; border-radius: 10px; background: var(--surface-2); border: 1px solid var(--line-2); }
+  .ledger .side .t { font-size: 11.5px; color: var(--muted); }
+  .ledger .side .v { font-size: 20px; font-weight: 650; letter-spacing: -.02em; }
+  .ledger .side:last-child { text-align: right; }
+  .ledger .eq { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-size: 13px; font-weight: 700; background: var(--ok-soft); color: var(--ok); }
+  .ledger.off .eq { background: var(--bad-soft); color: var(--bad); }
+  .tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 12px; }
+  .tile { padding: 9px 10px; border-radius: 9px; border: 1px solid var(--line-2); }
+  .tile .t { font-size: 11.5px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+  .tile .t i { width: 6px; height: 6px; border-radius: 50%; }
+  .tile .v { font-size: 17px; font-weight: 620; margin-top: 2px; }
+  .sect { font-size: 11px; text-transform: uppercase; letter-spacing: .07em; color: var(--faint); margin: 16px 0 6px; }
+  .faults { display: grid; grid-template-columns: 1fr 1fr; gap: 0 18px; }
+  .frow { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px dashed var(--line); font-size: 12.5px; }
+  .frow span:first-child { color: var(--muted); }
+  .frow b { font-weight: 600; }
+  .frow.hot b { color: var(--pending); }
+
+  /* Activity */
+  .feed { max-height: 420px; overflow: auto; }
+  .ev { display: grid; grid-template-columns: 76px 88px minmax(0, 1fr) minmax(0, 1fr); gap: 12px; align-items: center; padding: 8px 18px; border-top: 1px solid var(--line-2); font-size: 12.5px; }
+  .ev:first-child { border-top: 0; }
+  .ev.fresh { animation: fresh 1.2s ease-out; }
+  @keyframes fresh { from { background: var(--sold-soft); } to { background: transparent; } }
+  .ev .why { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tr { display: flex; align-items: center; gap: 6px; min-width: 0; flex-wrap: wrap; }
+  .chip { display: inline-flex; align-items: center; height: 20px; padding: 0 7px; border-radius: 5px; font-size: 10.5px; font-weight: 650; letter-spacing: .02em; white-space: nowrap; }
+  .arrow { color: var(--faint); font-size: 11px; }
+  .empty { padding: 28px 18px; text-align: center; color: var(--faint); font-size: 13px; }
+
+  @media (max-width: 980px) {
+    .grid { grid-template-columns: minmax(0, 1fr); }
+    .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+  @media (max-width: 560px) {
+    .topbar-in, main { padding-left: 16px; padding-right: 16px; }
+    .kpi .val { font-size: 24px; }
+    .cells { grid-template-columns: repeat(20, minmax(0, 1fr)); gap: 2px; }
+    .ev { grid-template-columns: 64px minmax(0, 1fr); padding: 8px 16px; }
+    .ev .oid, .ev .why { display: none; }
+    .faults { grid-template-columns: 1fr; }
+    .stages { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 0; }
+    .stage:nth-child(3) { border-left: 0; padding-left: 0; }
+    .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .live .txt { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="topbar">
+  <div class="topbar-in">
+    <div class="brand">
+      <div class="logo" aria-hidden="true">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4 14h7l-1 8 9-12h-7l1-8z"/></svg>
+      </div>
+      <div style="min-width:0">
+        <h1 id="product">Flash sale</h1>
+        <div class="sub" id="meta">connecting…</div>
+      </div>
+    </div>
+    <span class="live" id="live"><span class="dot"></span><span class="txt" id="live-txt">Live</span></span>
+    <div class="integrity-wrap">
+      <button class="pill" id="integrity" aria-expanded="false" aria-controls="integrity-pop">
+        <span class="ic">✓</span><span id="integrity-txt">Checking books…</span>
+        <svg class="chev" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m6 9 6 6 6-6"/></svg>
+      </button>
+      <div class="popover" id="integrity-pop" role="dialog" aria-label="Integrity checks">
+        <header><b>Integrity checks</b><span>one consistent DB snapshot</span></header>
+        <div class="checks" id="checks"></div>
+      </div>
+    </div>
+    <button class="btn" id="reset" title="Restock and clear all orders and payments">Reset sale</button>
+  </div>
+</div>
+
+<main>
+  <div class="banner" id="banner"></div>
+
+  <section class="kpis">
+    <div class="card kpi">
+      <div class="lbl"><i style="background:var(--sold)"></i>Units sold</div>
+      <div class="val"><span id="k-sold">–</span><small id="k-total">/ –</small></div>
+      <div class="meter"><i id="m-sold" style="background:var(--sold);width:0"></i><i id="m-res" style="background:var(--reserved);width:0"></i></div>
+      <div class="foot" id="k-sold-foot">&nbsp;</div>
+    </div>
+    <div class="card kpi">
+      <div class="lbl"><i style="background:var(--ok)"></i>Revenue</div>
+      <div class="val" id="k-rev">–</div>
+      <div class="foot" id="k-rev-foot">&nbsp;</div>
+    </div>
+    <div class="card kpi">
+      <div class="lbl"><i style="background:var(--reserved)"></i>In checkout</div>
+      <div class="val" id="k-hold">–</div>
+      <div class="foot" id="k-hold-foot">&nbsp;</div>
+    </div>
+    <div class="card kpi">
+      <div class="lbl"><i style="background:var(--idle)"></i>Available now</div>
+      <div class="val" id="k-avail">–</div>
+      <div class="foot" id="k-avail-foot">&nbsp;</div>
+    </div>
+  </section>
+
+  <section class="card" style="margin-top:12px">
+    <div class="card-h"><h2>Demand</h2><span class="aside" id="funnel-aside"></span></div>
+    <div class="card-b">
+      <div class="stages" id="stages"></div>
+      <div class="outcomes" id="outcomes"></div>
+      <div class="outcomes-key" id="outcomes-key"></div>
+    </div>
+  </section>
+
+  <div class="grid">
+    <section class="card">
+      <div class="card-h"><h2>Inventory</h2><span class="aside">every square is one phone</span></div>
+      <div class="card-b">
+        <div id="warehouses"></div>
+        <div class="legend">
+          <span><i style="background:var(--sold)"></i>Sold</span>
+          <span><i style="background:var(--reserved)"></i>Held in checkout</span>
+          <span><i style="background:var(--cell-empty)"></i>Available</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="card-h"><h2>Order lifecycle</h2><span class="aside" id="orders-total"></span></div>
+      <div class="card-b">
+        <div class="stack" id="stack"></div>
+        <div class="groups" id="groups"></div>
+      </div>
+    </section>
+
+    <section class="card flex">
+      <div class="card-h"><h2>Sell-through</h2><span class="aside chart-key"><span><i style="background:var(--sold)"></i>Sold</span><span><i class="dash"></i>Sold + held</span><span><i class="bar"></i><span id="rps-key">Requests/s</span></span></span></div>
+      <div class="card-b" style="padding-top:8px"><svg class="chart" id="chart" preserveAspectRatio="none"></svg></div>
+    </section>
+
+    <section class="card">
+      <div class="card-h"><h2>Payments</h2><span class="aside" id="psp-aside"></span></div>
+      <div class="card-b" id="psp"></div>
+    </section>
+  </div>
+
+  <section class="card" style="margin-top:12px">
+    <div class="card-h" style="padding-bottom:12px"><h2>Activity</h2><span class="aside">latest state transitions</span></div>
+    <div class="feed" id="events"></div>
+  </section>
+</main>
+
+<script>
+const STATE = {
+  RESERVED:        { label: 'Reserved',        color: 'var(--reserved)', soft: 'var(--reserved-soft)' },
+  PAYMENT_PENDING: { label: 'Payment pending', color: 'var(--pending)',  soft: 'var(--reserved-soft)' },
+  CONFIRMED:       { label: 'Confirmed',       color: 'var(--sold)',     soft: 'var(--sold-soft)' },
+  EXPIRED:         { label: 'Expired',         color: 'var(--idle)',     soft: 'var(--idle-soft)' },
+  CANCELLED:       { label: 'Cancelled',       color: 'var(--idle)',     soft: 'var(--idle-soft)' },
+  PAYMENT_FAILED:  { label: 'Payment failed',  color: 'var(--bad)',      soft: 'var(--bad-soft)' },
+  REFUND_PENDING:  { label: 'Refund pending',  color: 'var(--refund)',   soft: 'var(--refund-soft)' },
+  REFUNDED:        { label: 'Refunded',        color: 'var(--refund)',   soft: 'var(--refund-soft)' },
+};
+const GROUPS = [
+  ['In flight', ['RESERVED', 'PAYMENT_PENDING']],
+  ['Completed', ['CONFIRMED']],
+  ['Released back to stock', ['EXPIRED', 'CANCELLED', 'PAYMENT_FAILED']],
+  ['Money returned', ['REFUND_PENDING', 'REFUNDED']],
+];
+const PSP_STATUS = {
+  SUCCEEDED: 'var(--ok)', PENDING: 'var(--pending)', FAILED: 'var(--bad)',
+  CANCELLED: 'var(--idle)', REFUNDED: 'var(--refund)',
+};
+
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+// Only touch the DOM when content changed, so scroll positions and hover states survive polling.
+const setHtml = (id, html) => { const el = $(id); if (el._html !== html) { el.innerHTML = html; el._html = html; } };
+const fmt = (n) => Number(n ?? 0).toLocaleString('en-IN');
+const inr = (cents) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(cents / 100);
+const chip = (s) => {
+  const m = STATE[s];
+  return m ? `<span class="chip" style="background:${m.soft};color:${m.color}">${esc(m.label)}</span>`
+           : `<span class="chip" style="background:var(--idle-soft);color:var(--muted)">${esc(s ?? 'new')}</span>`;
+};
+
+// ---- Integrity popover ------------------------------------------------------------------
+const pill = $('integrity'), pop = $('integrity-pop');
+pill.addEventListener('click', (e) => {
+  e.stopPropagation();
+  const open = !pop.classList.contains('open');
+  pop.classList.toggle('open', open);
+  pill.setAttribute('aria-expanded', String(open));
+});
+document.addEventListener('click', (e) => {
+  if (!pop.contains(e.target)) { pop.classList.remove('open'); pill.setAttribute('aria-expanded', 'false'); }
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') { pop.classList.remove('open'); pill.setAttribute('aria-expanded', 'false'); }
+});
+
+// ---- Reset -------------------------------------------------------------------------------
+$('reset').addEventListener('click', async () => {
+  if (!confirm('Restock every warehouse and clear all orders and payments?')) return;
+  const b = $('reset');
+  b.disabled = true; b.textContent = 'Resetting…';
+  try {
+    const r = await fetch('/admin/reset', { method: 'POST' });
+    if (!r.ok) throw new Error(r.status === 404 ? 'admin endpoints are disabled' : `HTTP ${r.status}`);
+    seenEvents.clear(); firstEvents = true;
+  } catch (err) {
+    alert('Reset failed: ' + err.message);
+  } finally {
+    b.disabled = false; b.textContent = 'Reset sale';
+  }
+});
+
+// ---- Sell-through chart ------------------------------------------------------------------
+// Drawn from the server's timeline (rebuilt from the audit log), so it survives a refresh.
+// The x axis spans the sale itself: it follows "now" while there is activity, then freezes
+// a few seconds after the last event so the sale stays on screen afterwards.
+let lastTimeline = null, lastTotal = 0;
+
+function niceStep(span, target) {
+  const raw = span / target, mag = 10 ** Math.floor(Math.log10(raw));
+  return [1, 2, 5, 10].map((m) => m * mag).find((s) => s >= raw);
+}
+
+function drawChart(tl = lastTimeline, total = lastTotal) {
+  lastTimeline = tl; lastTotal = total;
+  const svg = $('chart');
+  const W = svg.clientWidth || 600, H = svg.clientHeight || 200;
+  if (!W || !H || !tl) return;
+  const padL = 30, padR = 8, padT = 8, padB = 18;
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  const y = (v) => padT + (1 - v / Math.max(total, 1)) * (H - padT - padB);
+
+  let out = '';
+  for (const f of [0, .25, .5, .75, 1]) {
+    const v = Math.round(total * f), yy = y(v);
+    out += `<line class="gl" x1="${padL}" x2="${W - padR}" y1="${yy}" y2="${yy}"/>`;
+    out += `<text class="ax" x="${padL - 6}" y="${yy + 3.5}" text-anchor="end">${v}</text>`;
+  }
+
+  const { stock, attempts } = tl;
+  if (!stock.length && !attempts.length) {
+    $('rps-key').textContent = 'Requests/s';
+    svg.innerHTML = out + `<text class="chart-empty" x="${(W + padL) / 2}" y="${(H - padB) / 2}" text-anchor="middle">No sale yet</text>`;
+    return;
+  }
+  const first = Math.min(stock[0]?.[0] ?? Infinity, attempts[0]?.[0] ?? Infinity);
+  const lastActivity = Math.max(stock.at(-1)?.[0] ?? 0, (attempts.at(-1)?.[0] ?? 0) + 1000);
+  const end = Math.max(Math.min(tl.now, lastActivity + 5000), first + 10_000);
+  const start = first - Math.max(1000, (end - first) * 0.04);
+  const x = (t) => padL + ((t - start) / (end - start)) * (W - padL - padR);
+
+  // Time axis, in seconds since the first purchase attempt.
+  const step = niceStep((end - first) / 1000, 5);
+  for (let sec = 0; first + sec * 1000 <= end; sec += step) {
+    const xx = x(first + sec * 1000);
+    if (xx > W - padR - 14 && sec) break;
+    out += `<text class="ax" x="${xx}" y="${H - 4}" text-anchor="${sec ? 'middle' : 'start'}">${sec}s</text>`;
+  }
+
+  // Requests per second, as faint bars on their own scale (up to 40% of the plot height).
+  const peak = Math.max(...attempts.map((a) => a[1]), 1);
+  const barH = (n) => (n / peak) * 0.4 * (H - padT - padB);
+  for (const [t, n] of attempts) {
+    const x0 = Math.max(x(t), padL), x1 = Math.min(x(t + 1000), W - padR);
+    if (x1 > x0) out += `<rect x="${x0 + 0.5}" y="${y(0) - barH(n)}" width="${Math.max(x1 - x0 - 1, 1)}" height="${barH(n)}" fill="var(--faint)" fill-opacity=".22"/>`;
+  }
+  $('rps-key').textContent = `Requests/s · peak ${fmt(peak)}`;
+
+  // Running totals of sold and held units, drawn as steps.
+  let sold = 0, held = 0;
+  const pts = [[start, 0, 0]];
+  for (const [t, ds, dh] of stock) { sold += ds; held += dh; pts.push([t, sold, held]); }
+  pts.push([end, sold, held]);
+  const line = (key) => pts.map((p, i) => i
+    ? `H${x(p[0]).toFixed(1)}V${y(key(p)).toFixed(1)}`
+    : `M${x(p[0]).toFixed(1)},${y(key(p)).toFixed(1)}`).join('');
+  const area = (key) => `${line(key)}V${y(0)}H${x(start)}Z`;
+  const committed = (p) => p[1] + p[2];
+  out += `<defs><linearGradient id="gs" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--sold)" stop-opacity=".28"/><stop offset="1" stop-color="var(--sold)" stop-opacity=".02"/></linearGradient></defs>`;
+  out += `<path d="${area(committed)}" fill="var(--reserved)" fill-opacity=".16"/>`;
+  out += `<path d="${area((p) => p[1])}" fill="url(#gs)"/>`;
+  out += `<path d="${line(committed)}" fill="none" stroke="var(--reserved)" stroke-width="1.5" stroke-dasharray="3 3"/>`;
+  out += `<path d="${line((p) => p[1])}" fill="none" stroke="var(--sold)" stroke-width="2" stroke-linejoin="round"/>`;
+  out += `<circle cx="${x(end)}" cy="${y(sold)}" r="3.5" fill="var(--sold)" stroke="var(--surface)" stroke-width="2"/>`;
+  svg.innerHTML = out;
+}
+
+// ---- Demand funnel -----------------------------------------------------------------------
+const OUTCOMES = [
+  ['reserved',                 'Got a hold',               'var(--reserved)'],
+  ['sold_out',                 'Sold out',                 'var(--idle)'],
+  ['OVERLOADED',               'Busy, told to retry',      'var(--pending)'],
+  ['existing',                 'Duplicate, replayed',      'var(--ok)'],
+  ['already_has_active_order', 'One per customer',         'var(--refund)'],
+  ['idempotency_key_reused',   'Rejected key reuse',       'var(--bad)'],
+  ['unknown_product',          'Unknown product',          'var(--bad)'],
+];
+
+function renderFunnel(stats) {
+  const a = stats.attempts ?? {};
+  const o = stats.orders;
+  const requests = Object.values(a).reduce((s, n) => s + n, 0);
+  const holds = Object.values(o).reduce((s, n) => s + n, 0);
+  const paying = stats.paymentsRecorded ?? 0;
+  const confirmed = o.CONFIRMED ?? 0;
+  const conv = (n, of, what) => (of ? `${((100 * n) / of).toFixed(n && n < of / 100 ? 2 : 1)}% of ${what}` : '&nbsp;');
+
+  $('funnel-aside').textContent = requests && confirmed
+    ? `1 in ${fmt(Math.round(requests / confirmed))} requests ended in a sale`
+    : requests ? `${fmt(requests)} requests so far` : '';
+  setHtml('stages', [
+    ['Purchase requests', requests, 'incl. client retries'],
+    ['Got a hold', holds, conv(holds, requests, 'requests')],
+    ['Reached payment', paying, conv(paying, holds, 'holds')],
+    ['Confirmed sales', confirmed, conv(confirmed, paying, 'payments')],
+  ].map(([t, v, c]) => `<div class="stage"><div class="t">${t}</div><div class="v">${fmt(v)}</div><div class="c">${c}</div></div>`).join(''));
+
+  const known = new Set(OUTCOMES.map((r) => r[0]));
+  const rows = OUTCOMES.filter(([k]) => a[k]);
+  const other = Object.entries(a).filter(([k]) => !known.has(k)).reduce((s, [, n]) => s + n, 0);
+  if (other) rows.push(['other', 'Other', 'var(--faint)']);
+  const count = (k) => (k === 'other' ? other : a[k]);
+  setHtml('outcomes', rows.map(([k, label, color]) =>
+    `<i title="${label}: ${fmt(count(k))}" style="flex-grow:${count(k)};background:${color}"></i>`).join(''));
+  setHtml('outcomes-key', requests
+    ? rows.map(([k, label, color]) => `<span><i style="background:${color}"></i>${label}<b>${fmt(count(k))}</b></span>`).join('')
+    : '<span>Every purchase request is counted here by outcome, including the ones turned away.</span>');
+}
+
+// ---- Render ------------------------------------------------------------------------------
+const seenEvents = new Set();
+let firstEvents = true;
+
+function render(stats, inv) {
+  const sum = (k) => stats.inventory.reduce((s, w) => s + w[k], 0);
+  const total = sum('total'), sold = sum('sold'), reserved = sum('reserved'), available = sum('available');
+  const o = stats.orders;
+  const price = stats.product?.price_cents ?? 0;
+
+  // Header
+  if (stats.product) {
+    $('product').textContent = stats.product.name;
+    document.title = `${sold}/${total} sold · ${stats.product.name}`;
+  }
+  $('meta').textContent = `${inr(price)} · ${fmt(total)} units across ${stats.inventory.length} warehouses · ` +
+    `${stats.config.workers} workers · hold ${stats.config.reservationTtlMs / 1000}s`;
+  $('live').classList.remove('down');
+  $('live-txt').textContent = `Live · pid ${stats.pid}`;
+
+  // Integrity pill (details live in the popover)
+  const failed = inv.checks.filter((c) => !c.ok);
+  pill.className = 'pill ' + (inv.ok ? 'ok' : 'bad');
+  pill.querySelector('.ic').textContent = inv.ok ? '✓' : '!';
+  $('integrity-txt').textContent = inv.ok ? 'Books balanced' : `${failed.length} check${failed.length > 1 ? 's' : ''} failing`;
+  const checkTitle = (n) => n.replace(/^(\w+): /, (_, w) => w.toUpperCase() + ' · ').replace(/^\w/, (ch) => ch.toUpperCase());
+  setHtml('checks', [...failed, ...inv.checks.filter((c) => c.ok)].map((c) =>
+    `<div class="chk ${c.ok ? '' : 'fail'}"><span class="s">${c.ok ? '✓' : '✕'}</span>
+     <span class="n">${esc(checkTitle(c.name))}</span><span class="d">${esc(c.detail)}</span></div>`).join(''));
+
+  // KPIs
+  const pct = (n) => (total ? (100 * n) / total : 0);
+  $('k-sold').textContent = fmt(sold);
+  $('k-total').textContent = `/ ${fmt(total)}`;
+  $('m-sold').style.width = pct(sold) + '%';
+  $('m-res').style.width = pct(reserved) + '%';
+  $('k-sold-foot').textContent = sold === total && total ? 'Sold out' : `${pct(sold).toFixed(0)}% sell-through`;
+  $('k-rev').textContent = inr(sold * price);
+  $('k-rev-foot').textContent = `${fmt(o.CONFIRMED ?? 0)} confirmed orders`;
+  $('k-hold').textContent = fmt(reserved);
+  $('k-hold-foot').textContent = `${fmt(o.RESERVED ?? 0)} reserved · ${fmt(o.PAYMENT_PENDING ?? 0)} paying`;
+  $('k-avail').textContent = fmt(available);
+  $('k-avail-foot').textContent = available ? 'ready to reserve' : reserved ? 'may return as holds expire' : 'nothing left';
+
+  // Inventory unit map
+  setHtml('warehouses', stats.inventory.map((w) => {
+    const cells = '<span class="sold"></span>'.repeat(w.sold) + '<span class="reserved"></span>'.repeat(w.reserved) + '<span></span>'.repeat(w.available);
+    return `<div class="wh"><div class="wh-h"><span><b>${esc(w.name)}</b><span class="code">${esc(w.warehouse_id)}</span></span>
+      <span class="nums">${w.sold} sold · ${w.reserved} held · ${w.available} free</span></div>
+      <div class="cells" role="img" aria-label="${esc(w.name)}: ${w.sold} sold, ${w.reserved} held, ${w.available} available of ${w.total}">${cells}</div></div>`;
+  }).join(''));
+
+  // Order lifecycle
+  const nOrders = Object.values(o).reduce((a, b) => a + b, 0);
+  $('orders-total').textContent = `${fmt(nOrders)} orders`;
+  setHtml('stack', nOrders
+    ? Object.keys(STATE).filter((s) => o[s]).map((s) => `<i title="${STATE[s].label}: ${o[s]}" style="flex-grow:${o[s]};background:${STATE[s].color}"></i>`).join('')
+    : '');
+  setHtml('groups', GROUPS.map(([title, states]) =>
+    `<div><div class="group-h">${title}</div>${states.map((s) =>
+      `<div class="srow ${o[s] ? '' : 'zero'}"><i style="background:${STATE[s].color}"></i><span>${STATE[s].label}</span><span class="n">${fmt(o[s] ?? 0)}</span></div>`).join('')}</div>`).join(''));
+
+  // Demand and chart
+  renderFunnel(stats);
+  drawChart(stats.timeline, total);
+
+  // Payments
+  renderPayments(stats);
+
+  // Activity feed
+  const evs = stats.recentEvents;
+  $('events').innerHTML = evs.length ? evs.map((e) => {
+    const key = `${e.order_id}|${e.to_state}|${e.created_at}`;
+    const fresh = !firstEvents && !seenEvents.has(key);
+    seenEvents.add(key);
+    return `<div class="ev ${fresh ? 'fresh' : ''}"><span class="mono muted">${new Date(e.created_at).toLocaleTimeString([], { hour12: false })}</span>
+      <span class="mono oid">${esc(e.order_id.slice(0, 8))}</span>
+      <span class="tr">${e.from_state ? chip(e.from_state) + '<span class="arrow">→</span>' : ''}${chip(e.to_state)}</span>
+      <span class="why mono">${esc(e.reason)}</span></div>`;
+  }).join('') : '<div class="empty">No orders yet. Run <span class="mono">npm run loadtest</span> to start the sale.</div>';
+  firstEvents = false;
+  if (seenEvents.size > 2000) seenEvents.clear();
+}
+
+function renderPayments(stats) {
+  const p = stats.provider;
+  const banner = $('banner');
+  if (!p) {
+    $('psp-aside').textContent = '';
+    $('psp').innerHTML = '<div class="empty">Payment provider unreachable.<br>Orders stay in checkout until it answers.</div>';
+    showBanner('err', 'Payment provider unreachable', 'Paying orders keep their units until the provider answers, so nothing can be sold twice.');
+    return;
+  }
+  const ours = stats.paymentsRecorded ?? 0;
+  const theirs = p.payments;
+  // The provider can never know fewer payments than we recorded unless it lost its state.
+  const outOfSync = theirs < ours;
+  if (outOfSync) {
+    showBanner('', 'Payment provider is out of sync',
+      `Orders reference ${fmt(ours)} payments but the provider only knows ${fmt(theirs)}. It keeps payments in memory, so it was probably restarted after the last sale. Reset the sale to start clean.`, true);
+  } else {
+    banner.className = 'banner';
+  }
+
+  $('psp-aside').textContent = `${fmt(p.webhooksSent)} webhooks delivered`;
+  const by = p.byStatus ?? {};
+  const statuses = ['SUCCEEDED', 'PENDING', 'FAILED', 'CANCELLED', 'REFUNDED'];
+  const faults = [
+    ['Duplicate webhooks', p.duplicateWebhooks], ['Lost webhooks', p.lostWebhooks],
+    ['Delivery retries', p.webhookDeliveryFailures], ['Slow responses', p.slowResponses],
+    ['Cancels refused', p.cancelsRefused],
+  ];
+  $('psp').innerHTML = `
+    <div class="ledger ${outOfSync ? 'off' : ''}">
+      <div class="side"><div class="t">Recorded by orders</div><div class="v">${fmt(ours)}</div></div>
+      <div class="eq" title="${outOfSync ? 'Books disagree' : 'Books agree'}">${outOfSync ? '≠' : '='}</div>
+      <div class="side"><div class="t">Known to provider</div><div class="v">${fmt(theirs)}</div></div>
+    </div>
+    <div class="tiles">${statuses.map((s) =>
+      `<div class="tile"><div class="t"><i style="background:${PSP_STATUS[s]}"></i>${s[0] + s.slice(1).toLowerCase()}</div><div class="v">${fmt(by[s] ?? 0)}</div></div>`).join('')}
+      <div class="tile"><div class="t">Captured</div><div class="v">${inr((by.SUCCEEDED ?? 0) * (stats.product?.price_cents ?? 0))}</div></div>
+    </div>
+    <div class="sect">Faults absorbed</div>
+    <div class="faults">${faults.map(([k, v]) => `<div class="frow ${v ? 'hot' : ''}"><span>${k}</span><b>${fmt(v)}</b></div>`).join('')}</div>`;
+}
+
+function showBanner(kind, title, body, withReset) {
+  const b = $('banner');
+  b.className = `banner show ${kind}`;
+  b.innerHTML = `<div><b>${esc(title)}</b>${esc(body)}</div>${withReset ? '<button class="btn act" onclick="document.getElementById(\'reset\').click()">Reset sale</button>' : ''}`;
+}
+
+// ---- Poll --------------------------------------------------------------------------------
+// Chain timeouts instead of setInterval, so a slow response never stacks requests.
+async function tick() {
+  try {
+    const [stats, inv] = await Promise.all([
+      fetch('/admin/stats').then((r) => r.json()),
+      fetch('/admin/invariants').then((r) => r.json()),
+    ]);
+    render(stats, inv);
+  } catch {
+    $('live').classList.add('down');
+    $('live-txt').textContent = 'Disconnected';
+    pill.className = 'pill bad';
+    $('integrity-txt').textContent = 'Service unreachable';
+    showBanner('err', 'Order service unreachable', 'Retrying every second. Is npm run up still running?');
+  }
+  setTimeout(tick, document.hidden ? 2000 : 500);
+}
+tick();
+addEventListener('resize', () => drawChart());
+</script>
+</body>
+</html>

@@ -1,0 +1,32 @@
+{
+  "name": "flash-sale-inventory",
+  "version": "1.0.0",
+  "description": "Distributed flash-sale ordering system that never oversells — Techcora PS4",
+  "scripts": {
+    "up": "tsx scripts/up.ts",
+    "db": "tsx scripts/db.ts",
+    "provider": "tsx payment-provider/server.ts",
+    "start": "tsx src/main.ts",
+    "loadtest": "tsx scripts/loadtest.ts",
+    "test": "tsx --test test/*.test.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "author": "",
+  "license": "MIT",
+  "type": "module",
+  "dependencies": {
+    "embedded-postgres": "^18.4.0-beta.17",
+    "fastify": "^5.12.5",
+    "pg": "^8.23.1",
+    "undici": "^8.11.2"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.4",
+    "@types/pg": "^8.23.1",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
