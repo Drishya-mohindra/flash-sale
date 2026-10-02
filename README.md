@@ -120,24 +120,24 @@ money is "theirs" (in flight), and either side can fail independently.
 
 ```mermaid
 flowchart LR
-    C[10,000 buyers<br/>load test clients] -->|HTTP + Idempotency-Key| LB
+    C["10,000 buyers<br/>load test clients"] -->|"HTTP + Idempotency-Key"| LB
 
-    subgraph Order service - Node cluster, stateless
-      LB((shared port :3000)) --> W1[worker 1]
-      LB --> W2[worker 2]
-      LB --> W3[worker 3]
-      LB --> W4[worker 4]
+    subgraph OS["Order service - Node cluster, stateless"]
+      LB(("shared port :3000")) --> W1["worker 1"]
+      LB --> W2["worker 2"]
+      LB --> W3["worker 3"]
+      LB --> W4["worker 4"]
     end
 
-    W1 & W2 & W3 & W4 -->|transactions<br/>row locks| PG[(Postgres<br/>source of truth)]
-    W1 & W2 & W3 & W4 -->|create / query /<br/>cancel / refund| PSP[Payment provider<br/>mock, separate process]
-    PSP -.->|signed webhook<br/>at-least-once, retried| LB
+    W1 & W2 & W3 & W4 -->|"transactions<br/>row locks"| PG[("Postgres<br/>source of truth")]
+    W1 & W2 & W3 & W4 -->|"create / query /<br/>cancel / refund"| PSP["Payment provider<br/>mock, separate process"]
+    PSP -.->|"signed webhook<br/>at-least-once, retried"| LB
 
-    subgraph in every worker
-      J1[expiry sweeper]
-      J2[payment reconciler]
-      J3[expired-payment watcher]
-      J4[refund worker]
+    subgraph JOBS["in every worker"]
+      J1["expiry sweeper"]
+      J2["payment reconciler"]
+      J3["expired-payment watcher"]
+      J4["refund worker"]
     end
     J1 & J2 & J3 & J4 --> PG
     J2 & J3 & J4 --> PSP
@@ -168,15 +168,15 @@ sequenceDiagram
     participant DB as Postgres
     participant P as Payment provider
     B->>S: POST /api/orders (Idempotency-Key)
-    S->>DB: BEGIN; insert order (claims key); take 1 unit (conditional UPDATE); COMMIT
+    S->>DB: BEGIN, insert order (claims key), take 1 unit (conditional UPDATE), COMMIT
     S-->>B: 201 RESERVED (expires in 15s)
     B->>S: POST /orders/:id/pay
-    S->>DB: RESERVED -> PAYMENT_PENDING (commit first)
+    S->>DB: RESERVED → PAYMENT_PENDING (commit first)
     S->>P: create payment (idempotent on orderId)
     S-->>B: 202 PAYMENT_PENDING
     P-->>S: webhook SUCCEEDED (maybe twice, maybe never)
-    S->>DB: BEGIN; record event id (dedupe); PAYMENT_PENDING -> CONFIRMED; reserved -> sold; COMMIT
-    Note over S,P: no webhook after 3s? the reconciler asks P directly
+    S->>DB: BEGIN, record event id (dedupe), PAYMENT_PENDING → CONFIRMED, reserved → sold, COMMIT
+    Note over S,P: no webhook after 3s? The reconciler asks P directly
 ```
 
 ---
